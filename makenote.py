@@ -46,12 +46,12 @@ def open_file(note_type, title=""):
     contents = ""
     if "fields" in note_type:
         contents = "\n".join([
-            "----",
+            "---",
             *[
                 f + ": " + " ".join(title) if f == "title" else f + ":"
                 for f in note_type["fields"].split(":")
             ],
-            "----"
+            "---"
         ])
     with open(filename, "w", encoding="utf8") as fh:
         fh.write(contents)
