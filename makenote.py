@@ -1,5 +1,6 @@
 import datetime
 import os
+import subprocess
 import sys
 import json
 
@@ -55,20 +56,27 @@ def open_file(note_type, title=""):
     with open(filename, "w", encoding="utf8") as fh:
         fh.write(contents)
 
-    os.execl(editor, editor, filename)
+    result = subprocess.run(
+        [editor, filename],
+        cwd=dir
+    )
+    # If they haven't changed from the default file and the editor
+    # exited unsuccessfully, just delete the file
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf8") as fh:
+            file_unchanged = fh.read() == contents
 
+        if file_unchanged and result.returncode != 0:
+            os.unlink(filename)
 
 def handle_search(config):
     if "search_command" not in config:
         print("Need to specify search_command in config")
         sys.exit(1)
 
-    if "search_basedir" in config:
-        os.chdir(config["search_basedir"])
-
-    os.execl(
-        config["search_command"],
-        config["search_command"],
+    subprocess.run(
+        [config["search_command"]],
+        cwd=config.get("search_basedir", None)
     )
 
 
