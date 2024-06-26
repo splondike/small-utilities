@@ -1,0 +1,4 @@
+#!/bin/sh
+export OPENAI_KEY=$(pass internet/openai-api)
+
+rlwrap --pass-sigint-as-sigterm --multi-line --prompt-colour=red --substitute-prompt '>> ' python $(dirname $(readlink -f $0))/openai.py $@
