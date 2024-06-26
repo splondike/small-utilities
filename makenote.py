@@ -32,7 +32,7 @@ def load_config():
         return {"note_types": []}
 
 
-def open_file(note_type, title=""):
+def open_file(note_type, title=None):
     editor = os.environ.get("EDITOR", "")
     if not editor:
         raise RuntimeError("Must set EDITOR environment variable")
@@ -43,16 +43,28 @@ def open_file(note_type, title=""):
     dir = note_type["location"]
     filename = os.path.join(dir, f"{timestamp}-{name}.md")
 
+    specials = {
+        "title": " ".join(title or ["untitled"]),
+        "date": datetime.datetime.now().strftime("%Y-%m-%d"),
+        "start_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+        "project_id": "+" + (title or ["untitled"])[0]
+    }
+
     contents = ""
     if "fields" in note_type:
         contents = "\n".join([
             "---",
             *[
-                f + ": " + " ".join(title) if f == "title" else f + ":"
+                f + ": " + specials[f] if f in specials else f + ":"
                 for f in note_type["fields"].split(":")
             ],
-            "---"
+            "---",
+            ""
         ])
+
+    if "body" in note_type:
+        contents += note_type["body"]
+
     with open(filename, "w", encoding="utf8") as fh:
         fh.write(contents)
 
@@ -74,8 +86,9 @@ def handle_search(config):
         print("Need to specify search_command in config")
         sys.exit(1)
 
+    cmd = config["search_command"]
     subprocess.run(
-        [config["search_command"]],
+        [cmd] if isinstance(cmd, str) else cmd,
         cwd=config.get("search_basedir", None)
     )
 
