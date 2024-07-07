@@ -1,0 +1,12 @@
+#!/bin/sh
+
+while read line;do
+    if echo "$line" | grep -q '^X-URL';then
+        url=$(echo "$line" | grep -P -o '(?<= ).+')
+        # I should just be able to spawn the new window with w3m
+        # as the process. But for some reason this puts w3m in download
+        # mode rather than interractive. So do the same thing this way.
+        window_id=$(kitty @ new-window)
+        kitty @ send-text --match id:$window_id "exec w3m $url"
+    fi
+done
