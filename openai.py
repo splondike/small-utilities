@@ -61,30 +61,32 @@ if system_prompt:
         "content": system_prompt
     })
 
-while True:
-    try:
-        prompt = input().strip()
-    except EOFError:
-        print("")
-        break
-
-    if prompt != "":
-        if prompt.startswith("!"):
-            # Replace the last prompt
-            history = history[:-2]
-
-        result = client.user_query(prompt, history=history)
-        print(result)
-        history += [
-            {
-                "role": "user",
-                "content": prompt
-            },
-            {
-                "role": "assistant",
-                "content": result
-            },
-        ]
-
-        if oneshot:
+if oneshot:
+    prompt = sys.stdin.read()
+    result = client.user_query(prompt, history=history)
+    print(result)
+else:
+    while True:
+        try:
+            prompt = input().strip()
+        except EOFError:
+            print("")
             break
+
+        if prompt != "":
+            if prompt.startswith("!"):
+                # Replace the last prompt
+                history = history[:-2]
+
+            result = client.user_query(prompt, history=history)
+            print(result)
+            history += [
+                {
+                    "role": "user",
+                    "content": prompt
+                },
+                {
+                    "role": "assistant",
+                    "content": result
+                },
+            ]

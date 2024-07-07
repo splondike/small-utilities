@@ -1,4 +1,8 @@
 #!/bin/sh
 export OPENAI_KEY=$(pass internet/openai-api)
 
-rlwrap --pass-sigint-as-sigterm --multi-line --prompt-colour=red --substitute-prompt '>> ' python $(dirname $(readlink -f $0))/openai.py $@
+if echo "$@" | grep -q ' -oneshot';then
+  python $(dirname $(readlink -f $0))/openai.py $@
+else
+  rlwrap --pass-sigint-as-sigterm --multi-line --prompt-colour=red --substitute-prompt '>> ' python $(dirname $(readlink -f $0))/openai.py $@
+fi
