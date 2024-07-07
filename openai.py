@@ -37,6 +37,7 @@ class OpenaiAPI:
 
 model = "gpt-3.5-turbo"
 system_prompt = None
+oneshot = False
 if len(sys.argv) > 1:
     args = sys.argv[1:]
     if args[0] == "-4":
@@ -44,8 +45,13 @@ if len(sys.argv) > 1:
         args = args[1:]
 
     if len(args) > 0:
-        with open(args[0]) as fh:
-            system_prompt = fh.read()
+        if args[0] == "-oneshot":
+            args = args[1:]
+            oneshot = True
+
+        if len(args) > 0:
+            with open(args[0]) as fh:
+                system_prompt = fh.read()
 
 client = OpenaiAPI(os.environ["OPENAI_KEY"], model=model)
 history = []
@@ -79,3 +85,6 @@ while True:
                 "content": result
             },
         ]
+
+        if oneshot:
+            break
