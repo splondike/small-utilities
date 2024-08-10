@@ -100,6 +100,8 @@ else:
             for chunk in client.user_query_streamed(prompt, history=history):
                 sys.stdout.write(chunk)
                 result += chunk
+            # So rlwrap doesn't eat the last line
+            sys.stdout.write("\n")
 
             history += [
                 {
