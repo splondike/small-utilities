@@ -1,6 +1,6 @@
 #!/bin/sh
-export OPENAI_KEY=$(pass internet/openai-api)
 
+export OPENAI_KEY=$($(dirname $0)/openai-password.gitignored)
 if echo "$@" | grep -q ' -oneshot';then
   python $(dirname $(readlink -f $0))/openai.py $@
 else
