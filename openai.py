@@ -1,8 +1,9 @@
-from typing import Iterator
-import os
+import argparse
 import json
+import os
 import sys
 import urllib.request
+from typing import Iterator
 
 
 class OpenaiAPI:
@@ -53,42 +54,26 @@ class OpenaiAPI:
                     buffer = buffer[maybe_idx + 1:]
 
 
-model = "gpt-3.5-turbo"
-system_prompt = None
-oneshot = False
-if len(sys.argv) > 1:
-    args = sys.argv[1:]
-    if args[0] == "-4":
-        model = "gpt-4o"
-        args = args[1:]
+def main():
+    parser = argparse.ArgumentParser(description="Simple CLI to ChatGPT")
+    parser.add_argument("--model", help="The model to use, e.g. gpt-4o-mini, gpt-4o", default="gpt-4o-mini")
+    parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
+    args = parser.parse_args()
 
-    if len(args) > 0:
-        if args[0] == "-oneshot":
-            args = args[1:]
-            oneshot = True
+    client = OpenaiAPI(os.environ["OPENAI_KEY"], model=args.model)
+    history = []
+    if args.system_prompt:
+        with open(args.system_prompt) as fh:
+            system_prompt = fh.read()
+        history.append({
+            "role": "system",
+            "content": system_prompt
+        })
 
-        if len(args) > 0:
-            with open(args[0]) as fh:
-                system_prompt = fh.read()
-
-client = OpenaiAPI(os.environ["OPENAI_KEY"], model=model)
-history = []
-if system_prompt:
-    history.append({
-        "role": "system",
-        "content": system_prompt
-    })
-
-if oneshot:
-    prompt = sys.stdin.read()
-    result = client.user_query(prompt, history=history)
-    print(result)
-else:
     while True:
         try:
             prompt = input().strip()
         except EOFError:
-            print("")
             break
 
         if prompt != "":
@@ -113,3 +98,7 @@ else:
                     "content": result
                 },
             ]
+
+
+if __name__ == "__main__":
+    main()
