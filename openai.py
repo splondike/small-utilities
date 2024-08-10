@@ -207,6 +207,9 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
             return "", f"Copied {item_id}{extra} to clipboard"
         else:
             return "", "Could not find item to copy"
+    elif command in ("/pop-history", "/ph"):
+        context.history = context.history[:-2]
+        return "", "Dropped last request/response from history"
     elif command == "":
         return prompt, ""
 
