@@ -58,6 +58,7 @@ def main():
     parser = argparse.ArgumentParser(description="Simple CLI to ChatGPT")
     parser.add_argument("--model", help="The model to use, e.g. gpt-4o-mini, gpt-4o", default="gpt-4o-mini")
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
+    parser.add_argument("--oneshot", help="Does nothing, used to help rlwrap wrapper", action="store_true")
     args = parser.parse_args()
 
     client = OpenaiAPI(os.environ["OPENAI_KEY"], model=args.model)
@@ -71,18 +72,16 @@ def main():
         })
 
     while True:
+        sys.stdout.write(">> ")
         try:
             prompt = input().strip()
         except EOFError:
             break
 
         if prompt != "":
-            if prompt.startswith("!"):
-                # Replace the last prompt
-                history = history[:-2]
-
+            prompt_modified = prompt
             result = ""
-            for chunk in client.user_query_streamed(prompt, history=history):
+            for chunk in client.user_query_streamed(prompt_modified, history=history):
                 sys.stdout.write(chunk)
                 result += chunk
             # So rlwrap doesn't eat the last line

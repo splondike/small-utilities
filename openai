@@ -1,8 +1,8 @@
 #!/bin/sh
 
 export OPENAI_KEY=$($(dirname $0)/openai-password.gitignored)
-if echo "$@" | grep -q ' -oneshot';then
+if echo "$@" | grep -q ' --oneshot';then
   python $(dirname $(readlink -f $0))/openai.py $@
 else
-  rlwrap --wait-before-prompt 500 --pass-sigint-as-sigterm --multi-line --prompt-colour=red --substitute-prompt '>> '  python -u $(dirname $(readlink -f $0))/openai.py $@
+  rlwrap --pass-sigint-as-sigterm --multi-line --prompt-colour=blue --only-cook '!.*>> ' python -u $(dirname $(readlink -f $0))/openai.py $@
 fi
