@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 from typing import Optional, Iterator, Tuple
@@ -61,7 +62,7 @@ class ChatContext():
         self.history = []
         self.files = []
 
-    def add_history(self, role: str, content: str, item_id: Optional[str]=None):
+    def add_history(self, role: str, content: str, item_id: str="unset"):
         """
         Adds the given item to the chat history.
         """
@@ -116,18 +117,40 @@ class ChatContext():
         ]
 
 
+def set_clipboard(content: str) -> bool:
+    commands = [
+        ["termux-clipboard-set"],
+        ["pbcopy"],
+    ]
+    for command in commands:
+        try:
+            subprocess.run(
+                command,
+                input=content.encode(),
+                check=True,
+                capture_output=True
+            )
+            return True
+        except FileNotFoundError:
+            pass
+    return False
+
+
 def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
     bits = prompt.split(" ", maxsplit=1)
-    command = bits[0] if len(bits) == 2 and bits[0].startswith("/") else ""
-    rest = bits[1] if len(bits) == 2 and bits[0].startswith("/") else prompt
+    command = ""
+    rest = prompt
+    if bits[0].startswith("/"):
+        command = bits[0]
+        rest = bits[1] if len(bits) == 2 else ""
 
-    if command == "/add":
+    if command in ("/add", "/a"):
         result = context.add_file(rest)
         if result:
             return "", f"Added file {rest}"
         else:
             return "", f"Failed to add file {rest}"
-    elif command == "/remove":
+    elif command in ("/remove", "/r"):
         found = False
         new_files = []
         for idx, file in enumerate(context.files):
@@ -138,9 +161,45 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
 
         context.files = new_files
         return "", "Removed file" if found else "Didn't find file"
-    elif command == "/remove-all":
+    elif command in ("/remove-all", "/ra"):
         context.files = []
         return "", "Removed all files"
+    elif command in ("/copy", "/c"):
+        item_id = None
+        content = ""
+        extra = ""
+        if rest == "":
+            for item in reversed(context.history):
+                if item["role"] == context.ROLE_ASSISTANT:
+                    content = item["content"]
+                    item_id = item["item_id"]
+                    break
+        elif rest == "c":
+            for item in reversed(context.history):
+                if item["role"] == context.ROLE_ASSISTANT:
+                    content = item["content"]
+                    item_id = item["item_id"]
+                    break
+
+            state = "start"
+            code_lines = []
+            for line in content.splitlines():
+                if state == "start":
+                    if line.startswith("```"):
+                        state = "code"
+                elif state == "code":
+                    if line.startswith("```"):
+                        state = "start"
+                    else:
+                        code_lines.append(line)
+            content = "\n".join(code_lines)
+            extra = " code"
+
+        if item_id:
+            set_clipboard(content)
+            return "", f"Copied {item_id}{extra} to clipboard"
+        else:
+            return "", "Could not find item to copy"
     elif command == "":
         return prompt, ""
 
