@@ -1,3 +1,4 @@
+from typing import Iterator
 import os
 import json
 import sys
@@ -9,8 +10,8 @@ class OpenaiAPI:
         self.token = token
         self.model = model
 
-    def user_query(self, prompt: str, history=None) -> str:
-        response = self._request({
+    def user_query_streamed(self, prompt: str, history=None) -> Iterator[str]:
+        data = {
             "model": self.model,
             "messages": [
                 *(history or []),
@@ -18,11 +19,10 @@ class OpenaiAPI:
                     "role": "user",
                     "content": prompt,
                 }
-            ]
-        })
-        return response["choices"][0]["message"]["content"]
+            ],
+            "stream": True
+        }
 
-    def _request(self, data):
         request = urllib.request.Request(
             "https://api.openai.com/v1/chat/completions",
             data=json.dumps(data).encode(),
@@ -31,8 +31,26 @@ class OpenaiAPI:
                 "Authorization": f"Bearer {self.token}"
             }
         )
+        buffer = b""
+        prefix = "data: "
         with urllib.request.urlopen(request) as fh:
-            return json.load(fh)
+            while response_body := fh.read(100):
+                buffer += response_body
+
+                maybe_idx = buffer.find(b"\n")
+                if maybe_idx != -1:
+                    line = buffer[:maybe_idx].decode()
+                    if line.startswith(prefix):
+                        data = line[len(prefix):]
+                        if data != "[DONE]":
+                            content = json.loads(data)
+                            choices = content["choices"]
+                            if len(choices) > 0:
+                                maybe_content = choices[0]["delta"].get("content")
+                                if maybe_content is not None:
+                                    yield maybe_content
+
+                    buffer = buffer[maybe_idx + 1:]
 
 
 model = "gpt-3.5-turbo"
@@ -78,8 +96,11 @@ else:
                 # Replace the last prompt
                 history = history[:-2]
 
-            result = client.user_query(prompt, history=history)
-            print(result)
+            result = ""
+            for chunk in client.user_query_streamed(prompt, history=history):
+                sys.stdout.write(chunk)
+                result += chunk
+
             history += [
                 {
                     "role": "user",
