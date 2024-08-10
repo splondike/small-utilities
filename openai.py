@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 import urllib.request
-from typing import Optional, Iterator, Tuple
+from typing import Iterator, Tuple
 
 
 class OpenaiAPI:
@@ -168,18 +168,25 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
         item_id = None
         content = ""
         extra = ""
+        def _find(matcher):
+            nonlocal content, item_id
+            for item in reversed(context.history):
+                if item["role"] == context.ROLE_ASSISTANT and matcher(item["item_id"]):
+                    content = item["content"]
+                    item_id = item["item_id"]
+                    break
+
         if rest == "":
-            for item in reversed(context.history):
-                if item["role"] == context.ROLE_ASSISTANT:
-                    content = item["content"]
-                    item_id = item["item_id"]
-                    break
-        elif rest == "c":
-            for item in reversed(context.history):
-                if item["role"] == context.ROLE_ASSISTANT:
-                    content = item["content"]
-                    item_id = item["item_id"]
-                    break
+            _find(lambda _: True)
+        elif rest.startswith("r"):
+            _find(lambda item: item == rest)
+        if rest.startswith("c"):
+            if len(rest) > 1:
+                item_id = "r" + rest[1:]
+                _find(lambda item: item == item_id)
+            else:
+                _find(lambda _: True)
+
 
             state = "start"
             code_lines = []
@@ -220,14 +227,13 @@ def main():
 
     response_counter = 0
     while True:
-        response_id = f"r{response_counter:02}"
         files = ""
         if len(context.files) > 0:
             files = " " + " ".join([
                 file["filename"]
                 for file in context.files
             ])
-        sys.stdout.write(f"{response_id}{files}>> ")
+        sys.stdout.write(f"{len(context.history):03} r{response_counter:03}{files}>> ")
         try:
             prompt = input().strip()
         except EOFError:
@@ -245,7 +251,7 @@ def main():
             sys.stdout.write("\n")
 
             context.add_history(context.ROLE_USER, prompt)
-            context.add_history(context.ROLE_ASSISTANT, result, item_id=response_id)
+            context.add_history(context.ROLE_ASSISTANT, result, item_id=f"r{response_counter}")
             response_counter += 1
 
 if __name__ == "__main__":
