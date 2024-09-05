@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import select
 import subprocess
 import sys
 import urllib.request
@@ -237,10 +238,15 @@ def main():
                 for file in context.files
             ])
         sys.stdout.write(f"{len(context.history):03} r{response_counter:03}{files}>> ")
-        try:
-            prompt = input().strip()
-        except EOFError:
+
+        # Coalesce multiple lines into a single prompt if they come rapidly.
+        # Allows us to supply a single multiline request to the model.
+        prompt = sys.stdin.readline()
+        if prompt == "":
             break
+        while select.select([sys.stdin,], [], [], 0.25)[0]:
+            prompt += sys.stdin.readline()
+        prompt = prompt.strip()
 
         prompt_modified, info_message = process_prompt(context, prompt)
         if info_message != "":
