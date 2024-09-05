@@ -1,4 +1,5 @@
 import argparse
+import io
 import json
 import os
 import select
@@ -122,15 +123,18 @@ def set_clipboard(content: str) -> bool:
     commands = [
         ["termux-clipboard-set"],
         ["pbcopy"],
+        ["wl-copy"],
     ]
     for command in commands:
         try:
-            subprocess.run(
+            proc = subprocess.Popen(
                 command,
-                input=content.encode(),
-                check=True,
-                capture_output=True
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL
             )
+            proc.stdin.write(content.encode())
+            proc.stdin.close()
+            proc.wait()
             return True
         except FileNotFoundError:
             pass
@@ -204,8 +208,11 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
             extra = " code"
 
         if item_id:
-            set_clipboard(content)
-            return "", f"Copied {item_id}{extra} to clipboard"
+            copied = set_clipboard(content)
+            if copied:
+                return "", f"Copied {item_id}{extra} to clipboard"
+            else:
+                return "", f"Failed to copy {item_id}{extra} to clipboard"
         else:
             return "", "Could not find item to copy"
     elif command in ("/pop-history", "/ph"):
