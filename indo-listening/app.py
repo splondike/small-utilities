@@ -6,7 +6,7 @@ import sys
 
 
 def play(idx):
-    subprocess.run(["mpv", f"{idx}.mp3"], capture_output=True, check=True)
+    subprocess.run(["mpv", f"recordings/{idx}.mp3"], capture_output=True, check=True)
 
 
 def main():
