@@ -15,20 +15,19 @@ class AnthropicAPI:
 
     def user_query_streamed(self, messages: list) -> Iterator[str]:
         # Convert OpenAI message format to Anthropic format
-        prompt = ""
-        for msg in messages:
-            if msg["role"] == "system":
-                prompt += f"{msg['content']}\n\n"
-            elif msg["role"] == "user":
-                prompt += f"\n\nHuman: {msg['content']}"
-            elif msg["role"] == "assistant":
-                prompt += f"\n\nAssistant: {msg['content']}"
-
-        prompt += "\n\nAssistant:"
+        system = ""
+        for message in messages:
+            if message["role"] == ChatContext.ROLE_SYSTEM:
+                system = message["content"]
 
         data = {
             "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [
+                message
+                for message in messages
+                if message["role"] != ChatContext.ROLE_SYSTEM
+            ],
+            "system": system,
             "stream": True,
             "max_tokens": 4096
         }
@@ -49,8 +48,11 @@ class AnthropicAPI:
             while response_body := fh.read(100):
                 buffer += response_body
 
-                maybe_idx = buffer.find(b"\n")
-                if maybe_idx != -1:
+                # Avoid potential infinite loop
+                for _ in range(100):
+                    maybe_idx = buffer.find(b"\n")
+                    if maybe_idx == -1:
+                        break
                     line = buffer[:maybe_idx].decode()
                     if line.startswith(prefix):
                         data = line[len(prefix):]
@@ -89,8 +91,12 @@ class OpenaiAPI:
             while response_body := fh.read(100):
                 buffer += response_body
 
-                maybe_idx = buffer.find(b"\n")
-                if maybe_idx != -1:
+                # Avoid potential infinite loop
+                for _ in range(100):
+                    maybe_idx = buffer.find(b"\n")
+                    if maybe_idx == -1:
+                        break
+
                     line = buffer[:maybe_idx].decode()
                     if line.startswith(prefix):
                         data = line[len(prefix):]
