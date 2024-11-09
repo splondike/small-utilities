@@ -1,6 +1,7 @@
 #!/bin/sh
 
 export OPENAI_KEY=$($(dirname $0)/openai-password.gitignored)
+export ANTHROPIC_KEY=$($(dirname $0)/anthropic-password.gitignored)
 if echo "$@" | grep -q ' --oneshot';then
   python $(dirname $(readlink -f $0))/llm-chat.py $@
 else

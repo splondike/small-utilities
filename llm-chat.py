@@ -1,5 +1,4 @@
 import argparse
-import io
 import json
 import os
 import select
@@ -7,6 +6,61 @@ import subprocess
 import sys
 import urllib.request
 from typing import Iterator, Tuple
+
+
+class AnthropicAPI:
+    def __init__(self, token, model):
+        self.token = token
+        self.model = model
+
+    def user_query_streamed(self, messages: list) -> Iterator[str]:
+        # Convert OpenAI message format to Anthropic format
+        prompt = ""
+        for msg in messages:
+            if msg["role"] == "system":
+                prompt += f"{msg['content']}\n\n"
+            elif msg["role"] == "user":
+                prompt += f"\n\nHuman: {msg['content']}"
+            elif msg["role"] == "assistant":
+                prompt += f"\n\nAssistant: {msg['content']}"
+
+        prompt += "\n\nAssistant:"
+
+        data = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": True,
+            "max_tokens": 4096
+        }
+
+        request = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=json.dumps(data).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": self.token,
+                "anthropic-version": "2023-06-01"
+            }
+        )
+
+        buffer = b""
+        prefix = "data: "
+        with urllib.request.urlopen(request) as fh:
+            while response_body := fh.read(100):
+                buffer += response_body
+
+                maybe_idx = buffer.find(b"\n")
+                if maybe_idx != -1:
+                    line = buffer[:maybe_idx].decode()
+                    if line.startswith(prefix):
+                        data = line[len(prefix):]
+                        content = json.loads(data)
+                        delta = content.get("delta", {})
+                        text = delta.get("text", "")
+                        if text:
+                            yield text
+
+                    buffer = buffer[maybe_idx + 1:]
 
 
 class OpenaiAPI:
@@ -223,13 +277,22 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Simple CLI to ChatGPT")
-    parser.add_argument("--model", help="The model to use, e.g. gpt-4o-mini, gpt-4o", default="gpt-4o-mini")
+    parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
+    parser.add_argument("--model", 
+                       help="The model to use: gpt-4o-mini, gpt-4o, claude-haiku, claude-sonnet", 
+                       default="gpt-4o-mini")
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
     parser.add_argument("--oneshot", help="Does nothing, used to help rlwrap wrapper", action="store_true")
     args = parser.parse_args()
 
-    client = OpenaiAPI(os.environ["OPENAI_KEY"], model=args.model)
+    if args.model.startswith("claude-"):
+        model_map = {
+            "claude-haiku": "claude-3-haiku-20240307",
+            "claude-sonnet": "claude-3-sonnet-20240229"
+        }
+        client = AnthropicAPI(os.environ["ANTHROPIC_KEY"], model=model_map[args.model])
+    else:
+        client = OpenaiAPI(os.environ["OPENAI_KEY"], model=args.model)
     context = ChatContext()
     if args.system_prompt:
         with open(args.system_prompt) as fh:
