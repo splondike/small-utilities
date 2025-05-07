@@ -7,6 +7,7 @@ import argparse
 import csv
 import collections
 import json
+import re
 import subprocess
 import sys
 
@@ -26,24 +27,60 @@ def normalize_quantity(quantity_str):
     elif quantity_str.endswith("Gi"):
         return float(quantity_str[:-2]) * 1024
     else:
-        raise RuntimeError(f"Unhandled quantity_str: {quantity_str}")
+        # Just bytes
+        return float(quantity_str)
 
-def namespace_stats(log_progress):
+
+def glob_to_re(glob):
+    return re.compile(glob.replace(".", "\\.").replace("*", ".*").replace("?", "."))
+
+
+def namespace_stats(namespace, pod_globs, node_globs, log_progress):
     quantity_fieldnames = ["cpu", "memory", "cpu_daemonset", "memory_daemonset", "pod_count"]
-    ns_result = exec_json(["kubectl", "get", "ns", "-o", "json"])
+    if namespace == "all":
+        ns_result = exec_json(["kubectl", "get", "ns", "-o", "json"])
+        namespaces = [
+            ns["metadata"]["name"]
+            for ns in ns_result["items"]
+        ]
+    else:
+        namespaces = [namespace]
+
+    pod_globs_ = pod_globs or []
+    allowlist_pod_globs = [glob_to_re(g) for g in pod_globs_ if not g.startswith("!")]
+    denylist_pod_globs = [glob_to_re(g[1:]) for g in pod_globs_ if g.startswith("!")]
+    node_globs_ = node_globs or []
+    allowlist_node_globs = [glob_to_re(g) for g in node_globs_]
 
     namespace_results = collections.defaultdict(lambda: {q: 0.0 for q in quantity_fieldnames})
-    for ns in ns_result["items"]:
-        namespace = ns["metadata"]["name"]
-        pods = exec_json(["kubectl", "get", "pods", "-o", "json", "--namespace", namespace])
+    for namespace in namespaces:
+        pods_data = exec_json(["kubectl", "get", "pods", "-o", "json", "--namespace", namespace])
         # Ensure this exists
         namespace_results[namespace]
+
+        pods = []
+        for pod in pods_data["items"]:
+            name = pod["metadata"]["name"]
+            # May not have a node allocated
+            node_name = pod["spec"].get("nodeName", "")
+            if len(allowlist_pod_globs) > 0:
+                allowed = any(glob.match(name) for glob in allowlist_pod_globs)
+            else:
+                allowed = True
+
+            if len(allowlist_node_globs) > 0:
+                allowed = allowed and any(glob.match(node_name) for glob in allowlist_node_globs)
+
+            allowed = allowed and not any(glob.match(name) for glob in denylist_pod_globs)
+
+            if allowed:
+                pods.append(pod)
 
         if log_progress:
             sys.stderr.write(f"Fetching {namespace}\n")
 
-        namespace_results[namespace]["pod_count"] = len(pods["items"])
-        for pod in pods["items"]:
+        namespace_results[namespace]["pod_count"] = len(pods)
+        for pod in pods:
             is_daemonset = any(
                 ref["kind"] == "DaemonSet"
                 for ref in pod["metadata"].get("ownerReferences", [])
@@ -92,13 +129,17 @@ def main():
 
     parser.add_argument('--action', help="One of namespace-stats (default), and node-capacity", default="namespace-stats")
     parser.add_argument('--log-progress', action="store_true", help="Should we log out some messages to stderr while you wait", default=False)
+    parser.add_argument('--namespace', help="Just fetch this namespace", default="all")
+    parser.add_argument('--node-name-glob', nargs="*", help="Just fetch pods for this node", default="all")
+    parser.add_argument('--pod-name-glob', nargs="*", help="Just count pods matching this name. If prefixed with ! exclude those pods.")
 
     args = parser.parse_args()
 
     if args.action == "namespace-stats":
-        namespace_stats(args.log_progress)
+        namespace_stats(args.namespace, args.pod_name_glob, args.node_name_glob, args.log_progress)
     elif args.action == "node-capacity":
         node_capacity(args.log_progress)
+
 
 if __name__ == "__main__":
     main()
