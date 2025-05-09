@@ -1,0 +1,12 @@
+#!/usr/bin/env nu --stdin
+
+def main [] {
+    let data = from csv
+    print "<table>\n<tr>"
+    $data | columns | each {print -n ("<th>" ++ $in ++ "</th>")}
+    print "</tr>"
+    $data | each {
+        "<tr><td>" ++ ($in | values | str join "</td><td>") ++ "</td></tr>"
+    } | str join "\n" | print
+    print "</table>"
+}
