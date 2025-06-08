@@ -1,0 +1,11 @@
+#!/bin/sh
+
+prompt_dir=$HOME/sync/all/llm-prompts
+
+new_prompt=$(ls "$prompt_dir" | grep -v '^current$' | fzf)
+if [ $? != 0 ];then
+    exit
+fi
+cd "$prompt_dir"
+ln -sf "$new_prompt" current
+exec $(dirname $0)/aii

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+prompt=$HOME/sync/all/llm-prompts/current
+
+echo "System prompt: $(basename $(readlink -f "$prompt"))"
+$(dirname $0)/ai --system-prompt "$prompt" $@
