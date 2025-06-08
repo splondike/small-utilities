@@ -293,7 +293,8 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
             if role == ChatContext.ROLE_SYSTEM:
                 history_output.append(f"[SYSTEM] {content}")
             elif role == ChatContext.ROLE_USER:
-                history_output.append(f"[USER] {content}")
+                id_part = f" ({item_id})" if item_id and item_id != "unset" else ""
+                history_output.append(f"[USER{id_part}] {content}")
             elif role == ChatContext.ROLE_ASSISTANT:
                 id_part = f" ({item_id})" if item_id and item_id != "unset" else ""
                 history_output.append(f"[ASSISTANT{id_part}] {content}")
