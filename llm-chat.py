@@ -280,6 +280,26 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
     elif command in ("/pop-history", "/ph"):
         context.history = context.history[:-2]
         return "", "Dropped last request/response from history"
+    elif command in ("/print-history", "/prh"):
+        if not context.history:
+            return "", "No chat history to display"
+        
+        history_output = []
+        for item in context.history:
+            role = item["role"]
+            content = item["content"]
+            item_id = item.get("item_id", "")
+            
+            if role == ChatContext.ROLE_SYSTEM:
+                history_output.append(f"[SYSTEM] {content}")
+            elif role == ChatContext.ROLE_USER:
+                history_output.append(f"[USER] {content}")
+            elif role == ChatContext.ROLE_ASSISTANT:
+                id_part = f" ({item_id})" if item_id and item_id != "unset" else ""
+                history_output.append(f"[ASSISTANT{id_part}] {content}")
+        
+        print("\n" + "\n\n".join(history_output) + "\n")
+        return "", "Chat history printed above"
     elif command in ("/help", "/h"):
         help_text = """Available commands:
 /add <file>, /a <file>        - Add file to chat context
@@ -288,6 +308,7 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
 /copy [item], /c [item]       - Copy response to clipboard (latest if no item)
 /copy c[num], /c c[num]       - Copy code blocks from response
 /pop-history, /ph             - Remove last request/response from history
+/print-history, /prh          - Print all chat history to terminal
 /help, /h                     - Show this help message"""
         return "", help_text
     elif command == "":
