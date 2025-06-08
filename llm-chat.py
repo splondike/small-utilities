@@ -363,6 +363,50 @@ def restore_chat_history(context: ChatContext, log_filename: str):
         print(f"Warning: Error reading restore file {log_filename}: {e}")
 
 
+def read_prompt(fh, multiline_timeout=0.25):
+    """
+    Reads lines from the given file handle and returns a completed prompt.
+    Handles multiline input by waiting up to multiline_timeout seconds for
+    the next line. The counter resets after each line is received.
+    """
+
+    # If we're reading from a fifo passed to stdin, readline() won't block
+    # after the first time we've received input. Instead it will return an
+    # empty string immediately to indicate we're at the end of the file.
+    # select() will also not block under this condition.
+    # We also need to handle the case where we're reading from the terminal
+    # though. For this readline() and select() will block.
+
+    buffer = ""
+    fifo_mode = False
+
+    # Block until we have a line
+    while True:
+        line = fh.readline()
+        if line == "":
+            time.sleep(0.1)
+        else:
+            buffer += line
+            break
+    start_time = time.time()
+
+    while True:
+        # When interractive, wait for futher input for multiline_timeout seconds.
+        # Fifo will always be ready at this point.
+        ready, _, _ = select.select([fh], [], [], multiline_timeout)
+        if not ready:
+            break
+        line = fh.readline()
+        if line == "":
+            # This should only happen for the fifo case input
+            fifo_mode = True
+            if time.time() - start_time > multiline_timeout:
+                break
+            else:
+                time.sleep(0.1)
+        buffer += line
+    return buffer.strip(), fifo_mode
+
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
     parser.add_argument("--model", 
@@ -409,12 +453,14 @@ def main():
 
             # Coalesce multiple lines into a single prompt if they come rapidly.
             # Allows us to supply a single multiline request to the model.
-            prompt = sys.stdin.readline()
+            prompt, fifo_mode = read_prompt(sys.stdin)
             if prompt == "":
-                break
-            while select.select([sys.stdin,], [], [], 0.25)[0]:
-                prompt += sys.stdin.readline()
-            prompt = prompt.strip()
+                continue
+
+            if fifo_mode:
+                # If we're reading from a fifo, echo the prompt since it
+                # won't be visible otherwise
+                print(prompt)
 
             prompt_modified, info_message = process_prompt(context, prompt)
             if info_message != "":
