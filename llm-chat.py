@@ -292,6 +292,8 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
         return "", help_text
     elif command == "":
         return prompt, ""
+    else:
+        return "", f"Unknown command: {command} . Try /help."
 
 
 def log_message(log_file, actor, message, model=None, response_time=None):
