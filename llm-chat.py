@@ -285,8 +285,8 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
     parser.add_argument("--model", 
-                       help="The model to use: gpt-4o-mini, gpt-4o, claude-haiku, claude-sonnet", 
-                       default="gpt-4o-mini")
+                       help="The model to use: gpt-4.1-mini, gpt-4.1, claude-haiku, claude-sonnet", 
+                       default="gpt-4.1-nano")
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
     parser.add_argument("--oneshot", help="Does nothing, used to help rlwrap wrapper", action="store_true")
     args = parser.parse_args()
