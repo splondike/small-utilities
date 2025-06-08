@@ -289,7 +289,7 @@ def log_message(log_file, actor, message, model=None, response_time=None):
     if log_file:
         log_entry = {
             "timestamp": datetime.datetime.now().isoformat(),
-            "actor": actor,
+            "role": actor,
             "message": message
         }
         if model is not None:
@@ -352,7 +352,7 @@ def main():
             if info_message != "":
                 sys.stdout.write(info_message + "\n")
             elif prompt_modified != "":
-                log_message(log_file, "user", prompt)
+                log_message(log_file, context.ROLE_USER, prompt)
                 start_time = time.time()
                 result = ""
                 for chunk in client.user_query_streamed(context.build_messages(prompt_modified)):
@@ -362,7 +362,7 @@ def main():
                 sys.stdout.write("\n")
                 
                 response_time = time.time() - start_time
-                log_message(log_file, "agent", result, model=args.model, response_time=response_time)
+                log_message(log_file, context.ROLE_ASSISTANT, result, model=args.model, response_time=response_time)
                 context.add_history(context.ROLE_USER, prompt)
                 context.add_history(context.ROLE_ASSISTANT, result, item_id=f"r{response_counter}")
                 response_counter += 1
