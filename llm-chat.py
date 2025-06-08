@@ -280,6 +280,16 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
     elif command in ("/pop-history", "/ph"):
         context.history = context.history[:-2]
         return "", "Dropped last request/response from history"
+    elif command in ("/help", "/h"):
+        help_text = """Available commands:
+/add <file>, /a <file>        - Add file to chat context
+/remove <file>, /r <file>     - Remove file by name or index
+/remove-all, /ra              - Remove all files from context
+/copy [item], /c [item]       - Copy response to clipboard (latest if no item)
+/copy c[num], /c c[num]       - Copy code blocks from response
+/pop-history, /ph             - Remove last request/response from history
+/help, /h                     - Show this help message"""
+        return "", help_text
     elif command == "":
         return prompt, ""
 
