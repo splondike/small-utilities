@@ -359,7 +359,6 @@ def restore_chat_history(context: ChatContext, log_filename: str):
         print(f"Warning: Error reading restore file {log_filename}: {e}")
 
 
-
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
     parser.add_argument("--model", 
