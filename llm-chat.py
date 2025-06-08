@@ -318,7 +318,7 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
         return "", f"Unknown command: {command} . Try /help."
 
 
-def log_message(log_file, actor, message, model=None, response_time=None):
+def log_message(log_file, actor, message, model=None, response_time=None, item_id=None):
     """Log a message to the conversation log file in JSON format"""
     if log_file:
         log_entry = {
@@ -330,6 +330,8 @@ def log_message(log_file, actor, message, model=None, response_time=None):
             log_entry["model"] = model
         if response_time is not None:
             log_entry["response_time"] = response_time
+        if item_id is not None:
+            log_entry["item_id"] = item_id
         log_file.write(json.dumps(log_entry) + "\n")
         log_file.flush()
 
@@ -428,7 +430,7 @@ def main():
                 sys.stdout.write("\n")
                 
                 response_time = time.time() - start_time
-                log_message(log_file, context.ROLE_ASSISTANT, result, model=args.model, response_time=response_time)
+                log_message(log_file, context.ROLE_ASSISTANT, result, model=args.model, response_time=response_time, item_id=f"r{response_counter}")
                 context.add_history(context.ROLE_USER, prompt)
                 context.add_history(context.ROLE_ASSISTANT, result, item_id=f"r{response_counter}")
                 
