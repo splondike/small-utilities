@@ -380,9 +380,6 @@ def main():
                 context.add_history(context.ROLE_USER, prompt)
                 context.add_history(context.ROLE_ASSISTANT, result, item_id=f"r{response_counter}")
                 
-                # Call external hook if specified
-                call_hook(args.output_hook, context)
-                
                 response_counter += 1
     finally:
         if log_file:
