@@ -312,6 +312,32 @@ def log_message(log_file, actor, message, model=None, response_time=None):
         log_file.flush()
 
 
+def restore_chat_history(context: ChatContext, log_filename: str):
+    """Restore chat history from a log file"""
+    try:
+        with open(log_filename, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    role = entry.get("role")
+                    message = entry.get("message")
+                    
+                    # Only restore user and assistant messages, skip system messages
+                    # since system prompt is handled separately
+                    if role in (ChatContext.ROLE_USER, ChatContext.ROLE_ASSISTANT) and message:
+                        context.add_history(role, message)
+                except json.JSONDecodeError:
+                    # Skip malformed JSON lines
+                    continue
+    except FileNotFoundError:
+        print(f"Warning: Could not find restore file {log_filename}")
+    except Exception as e:
+        print(f"Warning: Error reading restore file {log_filename}: {e}")
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
@@ -320,6 +346,7 @@ def main():
                        default="gpt-4.1-nano")
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
     parser.add_argument("--log", help="Log the conversation to this file in JSON format")
+    parser.add_argument("--restore", help="Restore chat history from this log file")
     parser.add_argument("--oneshot", help="Does nothing, used to help rlwrap wrapper", action="store_true")
     args = parser.parse_args()
 
