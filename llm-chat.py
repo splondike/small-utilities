@@ -345,11 +345,12 @@ def restore_chat_history(context: ChatContext, log_filename: str):
                     entry = json.loads(line)
                     role = entry.get("role")
                     message = entry.get("message")
+                    item_id = entry.get("item_id", "unset")
                     
                     # Only restore user and assistant messages, skip system messages
                     # since system prompt is handled separately
                     if role in (ChatContext.ROLE_USER, ChatContext.ROLE_ASSISTANT) and message:
-                        context.add_history(role, message)
+                        context.add_history(role, message, item_id)
                 except json.JSONDecodeError:
                     # Skip malformed JSON lines
                     continue
