@@ -384,6 +384,9 @@ def main():
             system_prompt = fh.read()
         context.add_history(context.ROLE_SYSTEM, system_prompt)
 
+    if args.restore:
+        restore_chat_history(context, args.restore)
+
     log_file = None
     if args.log:
         log_file = open(args.log, "a")
