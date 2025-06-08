@@ -1,9 +1,11 @@
 import argparse
+import datetime
 import json
 import os
 import select
 import subprocess
 import sys
+import time
 import urllib.request
 from typing import Iterator, Tuple
 
@@ -282,12 +284,29 @@ def process_prompt(context: ChatContext, prompt: str) -> Tuple[str, str]:
         return prompt, ""
 
 
+def log_message(log_file, actor, message, model=None, response_time=None):
+    """Log a message to the conversation log file in JSON format"""
+    if log_file:
+        log_entry = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "actor": actor,
+            "message": message
+        }
+        if model is not None:
+            log_entry["model"] = model
+        if response_time is not None:
+            log_entry["response_time"] = response_time
+        log_file.write(json.dumps(log_entry) + "\n")
+        log_file.flush()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
     parser.add_argument("--model", 
                        help="The model to use: gpt-4.1-mini, gpt-4.1, claude-haiku, claude-sonnet", 
                        default="gpt-4.1-nano")
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
+    parser.add_argument("--log", help="Log the conversation to this file in JSON format")
     parser.add_argument("--oneshot", help="Does nothing, used to help rlwrap wrapper", action="store_true")
     args = parser.parse_args()
 
@@ -305,39 +324,51 @@ def main():
             system_prompt = fh.read()
         context.add_history(context.ROLE_SYSTEM, system_prompt)
 
+    log_file = None
+    if args.log:
+        log_file = open(args.log, "a")
+
     response_counter = 0
-    while True:
-        files = ""
-        if len(context.files) > 0:
-            files = " " + " ".join([
-                file["filename"]
-                for file in context.files
-            ])
-        sys.stdout.write(f"{len(context.history):03} r{response_counter:03}{files}>> ")
+    try:
+        while True:
+            files = ""
+            if len(context.files) > 0:
+                files = " " + " ".join([
+                    file["filename"]
+                    for file in context.files
+                ])
+            sys.stdout.write(f"{len(context.history):03} r{response_counter:03}{files}>> ")
 
-        # Coalesce multiple lines into a single prompt if they come rapidly.
-        # Allows us to supply a single multiline request to the model.
-        prompt = sys.stdin.readline()
-        if prompt == "":
-            break
-        while select.select([sys.stdin,], [], [], 0.25)[0]:
-            prompt += sys.stdin.readline()
-        prompt = prompt.strip()
+            # Coalesce multiple lines into a single prompt if they come rapidly.
+            # Allows us to supply a single multiline request to the model.
+            prompt = sys.stdin.readline()
+            if prompt == "":
+                break
+            while select.select([sys.stdin,], [], [], 0.25)[0]:
+                prompt += sys.stdin.readline()
+            prompt = prompt.strip()
 
-        prompt_modified, info_message = process_prompt(context, prompt)
-        if info_message != "":
-            sys.stdout.write(info_message + "\n")
-        elif prompt_modified != "":
-            result = ""
-            for chunk in client.user_query_streamed(context.build_messages(prompt_modified)):
-                sys.stdout.write(chunk)
-                result += chunk
-            # Put the prompt on its own line.
-            sys.stdout.write("\n")
-
-            context.add_history(context.ROLE_USER, prompt)
-            context.add_history(context.ROLE_ASSISTANT, result, item_id=f"r{response_counter}")
-            response_counter += 1
+            prompt_modified, info_message = process_prompt(context, prompt)
+            if info_message != "":
+                sys.stdout.write(info_message + "\n")
+            elif prompt_modified != "":
+                log_message(log_file, "user", prompt)
+                start_time = time.time()
+                result = ""
+                for chunk in client.user_query_streamed(context.build_messages(prompt_modified)):
+                    sys.stdout.write(chunk)
+                    result += chunk
+                # Put the prompt on its own line.
+                sys.stdout.write("\n")
+                
+                response_time = time.time() - start_time
+                log_message(log_file, "agent", result, model=args.model, response_time=response_time)
+                context.add_history(context.ROLE_USER, prompt)
+                context.add_history(context.ROLE_ASSISTANT, result, item_id=f"r{response_counter}")
+                response_counter += 1
+    finally:
+        if log_file:
+            log_file.close()
 
 if __name__ == "__main__":
     main()
