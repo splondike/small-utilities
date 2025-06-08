@@ -312,43 +312,6 @@ def log_message(log_file, actor, message, model=None, response_time=None):
         log_file.flush()
 
 
-def call_hook(hook_program, context, extra_entries=None):
-    """Call external hook program with chat history as JSONL"""
-    if not hook_program:
-        return
-    
-    try:
-        proc = subprocess.Popen(
-            [hook_program],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        
-        # Send any extra entries first
-        if extra_entries:
-            for entry in extra_entries:
-                proc.stdin.write((json.dumps(entry) + "\n").encode())
-        
-        # Send each history item as a separate JSON line (JSONL format)
-        # using the same format as log_message
-        for item in context.history:
-            log_entry = {
-                "timestamp": datetime.datetime.now().isoformat(),
-                "role": item["role"],
-                "message": item["content"]
-            }
-            if item.get("item_id"):
-                log_entry["item_id"] = item["item_id"]
-            
-            proc.stdin.write((json.dumps(log_entry) + "\n").encode())
-        
-        proc.stdin.close()
-        proc.wait()
-    except Exception:
-        # Silently ignore hook failures to not disrupt the chat
-        pass
-
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
@@ -358,7 +321,6 @@ def main():
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
     parser.add_argument("--log", help="Log the conversation to this file in JSON format")
     parser.add_argument("--oneshot", help="Does nothing, used to help rlwrap wrapper", action="store_true")
-    parser.add_argument("--output-hook", help="External program to call after each LLM response, receives chat history as JSON on stdin")
     args = parser.parse_args()
 
     if args.model.startswith("claude-"):
@@ -379,14 +341,6 @@ def main():
     if args.log:
         log_file = open(args.log, "a")
 
-    # Call hook at start of conversation if specified
-    if args.output_hook:
-        start_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "role": "system",
-            "message": "start-of-conversation"
-        }
-        call_hook(args.output_hook, context, extra_entries=[start_entry])
 
     response_counter = 0
     try:
