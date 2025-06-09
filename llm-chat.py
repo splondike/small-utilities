@@ -363,7 +363,7 @@ def restore_chat_history(context: ChatContext, log_filename: str):
         print(f"Warning: Error reading restore file {log_filename}: {e}")
 
 
-def read_prompt(fh, multiline_timeout=0.25):
+def read_prompt(multiline_timeout=0.25):
     """
     Reads lines from the given file handle and returns a completed prompt.
     Handles multiline input by waiting up to multiline_timeout seconds for
@@ -378,12 +378,13 @@ def read_prompt(fh, multiline_timeout=0.25):
     # though. For this readline() and select() will block.
 
     buffer = ""
-    fifo_mode = False
 
     # Block until we have a line
     while True:
-        line = fh.readline()
-        if line == "":
+        line = sys.stdin.readline()
+        if line == "" and sys.stdin.isatty():
+            raise EOFError()
+        elif line == "":
             time.sleep(0.1)
         else:
             buffer += line
@@ -393,19 +394,19 @@ def read_prompt(fh, multiline_timeout=0.25):
     while True:
         # When interractive, wait for futher input for multiline_timeout seconds.
         # Fifo will always be ready at this point.
-        ready, _, _ = select.select([fh], [], [], multiline_timeout)
+        ready, _, _ = select.select([sys.stdin], [], [], multiline_timeout)
         if not ready:
             break
-        line = fh.readline()
+        line = sys.stdin.readline()
         if line == "":
             # This should only happen for the fifo case input
-            fifo_mode = True
             if time.time() - start_time > multiline_timeout:
                 break
             else:
                 time.sleep(0.1)
         buffer += line
-    return buffer.strip(), fifo_mode
+    return buffer.strip()
+
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
@@ -453,14 +454,12 @@ def main():
 
             # Coalesce multiple lines into a single prompt if they come rapidly.
             # Allows us to supply a single multiline request to the model.
-            prompt, fifo_mode = read_prompt(sys.stdin)
+            try:
+                prompt = read_prompt()
+            except EOFError:
+                break
             if prompt == "":
                 continue
-
-            if fifo_mode:
-                # If we're reading from a fifo, echo the prompt since it
-                # won't be visible otherwise
-                print(prompt)
 
             prompt_modified, info_message = process_prompt(context, prompt)
             if info_message != "":
