@@ -8,4 +8,4 @@ if [ $? != 0 ];then
 fi
 cd "$prompt_dir"
 ln -sf "$new_prompt" current
-exec $(dirname $0)/aii
+exec $(dirname $0)/aii $@
