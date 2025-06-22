@@ -117,6 +117,10 @@ def process_md_file(file_path):
         created_at = parse_created_at_from_filename(file_path.name)
         if created_at:
             frontmatter['created_at'] = created_at
+
+        filename_parts = file_path.name.split("-")
+        frontmatter["id"] = filename_parts[0]
+        frontmatter["type"] = filename_parts[1] if len(filename_parts) > 1 else "unknown"
         
         # Ensure tags, expanded_tags and title are always present
         if 'tags' not in frontmatter:
