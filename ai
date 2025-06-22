@@ -1,7 +1,7 @@
 #!/bin/sh
 
-export OPENAI_KEY=$($(dirname $0)/openai-password.gitignored)
-export ANTHROPIC_KEY=$($(dirname $0)/anthropic-password.gitignored)
+export OPENAI_API_KEY=$($(dirname $0)/openai-password.gitignored)
+export ANTHROPIC_API_KEY=$($(dirname $0)/anthropic-password.gitignored)
 
 
 if echo "$@" | grep -q ' --oneshot';then

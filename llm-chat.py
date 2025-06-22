@@ -424,9 +424,9 @@ def main():
             "claude-haiku": "claude-3-haiku-20240307",
             "claude-sonnet": "claude-3-sonnet-20240229"
         }
-        client = AnthropicAPI(os.environ["ANTHROPIC_KEY"], model=model_map[args.model])
+        client = AnthropicAPI(os.environ["ANTHROPIC_API_KEY"], model=model_map[args.model])
     else:
-        client = OpenaiAPI(os.environ["OPENAI_KEY"], model=args.model)
+        client = OpenaiAPI(os.environ["OPENAI_API_KEY"], model=args.model)
     context = ChatContext()
     if args.system_prompt:
         with open(args.system_prompt) as fh:
