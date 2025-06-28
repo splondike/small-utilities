@@ -416,7 +416,7 @@ def main():
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
     parser.add_argument("--log", help="Log the conversation to this file in JSON format")
     parser.add_argument("--restore", help="Restore chat history from this log file")
-    parser.add_argument("--oneshot", help="Does nothing, used to help rlwrap wrapper", action="store_true")
+    parser.add_argument("--oneshot", help="Just accept some input on stdin, write the response and then exit", action="store_true")
     args = parser.parse_args()
 
     if args.model.startswith("claude-"):
@@ -450,7 +450,8 @@ def main():
                     file["filename"]
                     for file in context.files
                 ])
-            sys.stdout.write(f"{len(context.history):03} r{response_counter:03}{files}>> ")
+            if not args.oneshot:
+                sys.stdout.write(f"{len(context.history):03} r{response_counter:03}{files}>> ")
 
             # Coalesce multiple lines into a single prompt if they come rapidly.
             # Allows us to supply a single multiline request to the model.
@@ -480,6 +481,9 @@ def main():
                 context.add_history(context.ROLE_ASSISTANT, result, item_id=f"r{response_counter}")
                 
                 response_counter += 1
+
+            if args.oneshot:
+                break
     finally:
         if log_file:
             log_file.close()
