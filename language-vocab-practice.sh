@@ -24,17 +24,18 @@ while true;do
 
     data=$(echo "$prompt" | ai --oneshot 2>/dev/null)
 
-    read -p 'enter to play>'
+    read -p 'enter to play> '
     while true;do
         echo "$data" | head -n 1 | espeak-ng -v $elang -s $espeed -g $egap
-        read -p 'enter to replay, n to continue>' action
+        read -p 'enter to replay, n to continue> ' action
         if [ "$action" = "n" ];then
             break
         fi
     done
-    echo "$data" | head -n 1
-    echo -e "\e[90m"
+    echo -n "$data" | head -n 1
+    read -p 'enter to show english translation> '
+    echo -n -e "\e[90m"
     echo -n "$data" | tail -n 1
-    echo -e "\e[0m"
+    echo -n -e "\e[0m"
     echo ""
 done
