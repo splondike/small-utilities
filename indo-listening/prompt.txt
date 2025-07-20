@@ -1,4 +1,0 @@
-Generate 10 3-8 word sentences in indonesian primarily using the following words. Do not prefix the sentences with a number.
-
-WORDS:
-
