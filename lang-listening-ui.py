@@ -12,11 +12,15 @@ import tty
 import termios
 
 
-DEFAULT_SPEECH_COMMAND = ["espeak-ng", "-s", "50", "-v", "id"]
+DEFAULT_SPEECH_COMMAND = ["espeak-ng"]
 
 
 def print_usage(error=True):
-    print("Usage: listening-ui.py 3< examples.jsonl", file=sys.stderr)
+    name = sys.argv[0]
+    print(
+        f"Usage: {name} [-- <args to espeak-ng>] 3< examples.jsonl",
+        file=sys.stderr
+    )
     sys.exit(1 if error else 0)
 
 
@@ -25,9 +29,22 @@ def jsonl_iterator(fh: io.FileIO):
         yield json.loads(line)
 
 
-def speak_example(sentence: str) -> subprocess.Popen:
+def speak_example(
+    id: str,
+    sentence: str,
+    extra_args: list
+) -> subprocess.Popen:
+    maybe_speech_command = os.environ.get("SPEECH_COMMAND")
+    base_speech_command = \
+        [maybe_speech_command] if maybe_speech_command \
+        else DEFAULT_SPEECH_COMMAND
+    final_speech_command = base_speech_command + extra_args + [sentence]
     return subprocess.Popen(
-        DEFAULT_SPEECH_COMMAND + [sentence]
+        final_speech_command + [sentence],
+        env={
+            **os.environ,
+            "EXAMPLE_ID": id
+        }
     )
 
 
@@ -44,14 +61,23 @@ def print_example_header(idx: int):
     sys.stdout.write("\n")
 
 
+def parse_extra_speaker_args() -> list:
+    args = sys.argv[1:]
+    if "--" in args:
+        return args[args.index("--")+1:]
+    else:
+        return []
+
+
 def main():
-    # Let us read characters as soon as they're pressed
-    # and suppress outputting them
-    tty.setcbreak(sys.stdin.fileno(), termios.TCSANOW)
+    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
+        print_usage(False)
+
     try:
         examples_fh = os.fdopen(3)
     except OSError:
         print_usage()
+    extra_speaker_args = parse_extra_speaker_args()
 
     examples = jsonl_iterator(examples_fh)
     current_example = next(examples)
@@ -64,13 +90,21 @@ def main():
             current_speech_proc.send_signal(sig)
 
     def speech_proc_state():
-        if current_speech_proc is None or current_speech_proc.poll() is not None:
+        if (
+            current_speech_proc is None or
+            current_speech_proc.poll() is not None
+        ):
             return "stopped"
         else:
             return current_speech_proc_state
 
+    # Let us read characters as soon as they're pressed
+    # and suppress outputting them
+    tty.setcbreak(sys.stdin.fileno(), termios.TCSANOW)
+
     idx = 1
-    print_example_header(idx)
+    example_id = current_example.get("id", str(idx))
+    print_example_header(example_id)
     try:
         while True:
             foreign_sentence = current_example["foreign"]
@@ -85,11 +119,19 @@ def main():
                     current_speech_proc_state = "playing"
                     speech_proc_signal(signal.SIGCONT)
                 else:
-                    current_speech_proc = speak_example(foreign_sentence)
+                    current_speech_proc = speak_example(
+                        example_id,
+                        foreign_sentence,
+                        extra_speaker_args
+                    )
                     current_speech_proc_state = "playing"
             elif option == "r":
                 speech_proc_signal()
-                current_speech_proc = speak_example(foreign_sentence)
+                current_speech_proc = speak_example(
+                    example_id,
+                    foreign_sentence,
+                    extra_speaker_args
+                )
                 current_speech_proc_state = "playing"
             elif option == "\n":
                 if current_example_printstate == "foreign":
@@ -104,9 +146,10 @@ def main():
                 current_example_printstate = "foreign"
                 try:
                     current_example = next(examples)
+                    example_id = current_example.get("id", str(idx))
                 except StopIteration:
                     break
-                print_example_header(idx)
+                print_example_header(example_id)
             elif option == "q":
                 break
             else:
