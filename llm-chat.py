@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 import urllib.request
-from typing import Iterator, Tuple
+from typing import Iterator, Optional, Tuple
 
 
 class AnthropicAPI:
@@ -15,7 +15,11 @@ class AnthropicAPI:
         self.token = token
         self.model = model
 
-    def user_query_streamed(self, messages: list) -> Iterator[str]:
+    def user_query_streamed(
+        self,
+        messages: list,
+        temperature: Optional[float]
+    ) -> Iterator[str]:
         # Convert OpenAI message format to Anthropic format
         system = ""
         for message in messages:
@@ -29,6 +33,7 @@ class AnthropicAPI:
                 for message in messages
                 if message["role"] != ChatContext.ROLE_SYSTEM
             ],
+            "temperature": temperature or 1.0,
             "system": system,
             "stream": True,
             "max_tokens": 4096
@@ -72,10 +77,15 @@ class OpenaiAPI:
         self.token = token
         self.model = model
 
-    def user_query_streamed(self, messages: list) -> Iterator[str]:
+    def user_query_streamed(
+        self,
+        messages: list,
+        temperature: Optional[float]
+    ) -> Iterator[str]:
         data = {
             "model": self.model,
             "messages": messages,
+            "temperature": temperature or 1.0,
             "stream": True
         }
 
@@ -416,6 +426,7 @@ def main():
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
     parser.add_argument("--log", help="Log the conversation to this file in JSON format")
     parser.add_argument("--restore", help="Restore chat history from this log file")
+    parser.add_argument("--temperature", type=float, help="Adjust randomness")
     parser.add_argument("--oneshot", help="Just accept some input on stdin, write the response and then exit", action="store_true")
     args = parser.parse_args()
 
@@ -439,7 +450,6 @@ def main():
     log_file = None
     if args.log:
         log_file = open(args.log, "a")
-
 
     response_counter = 0
     try:
@@ -469,7 +479,10 @@ def main():
                 log_message(log_file, context.ROLE_USER, prompt)
                 start_time = time.time()
                 result = ""
-                for chunk in client.user_query_streamed(context.build_messages(prompt_modified)):
+                for chunk in client.user_query_streamed(
+                    context.build_messages(prompt_modified),
+                    args.temperature
+                ):
                     sys.stdout.write(chunk)
                     result += chunk
                 # Put the prompt on its own line.
