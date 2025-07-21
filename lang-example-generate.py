@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import pathlib
+import random
 import select
 import subprocess
 import sys
@@ -42,7 +43,10 @@ def generate_example(prompt_text: str) -> dict:
 
 def read_words():
     if select.select([sys.stdin], [], [], 0)[0]:
-        return " ".join(sys.stdin.readlines())
+        # Attempt to inject more variance into LLM by shuffling vocab
+        words = sys.stdin.readlines()
+        random.shuffle(words)
+        return " ".join(words)
     else:
         return None
 
