@@ -55,7 +55,7 @@ def print_example_header(idx: int):
         "Controls: space=play/pause, r=restart speech, enter=print example\n"
     )
     sys.stdout.write(
-        "          n=next example, q=quit"
+        "          n=next example, p=previous example, q=quit"
     )
     sys.stdout.write("\033[0m")
     sys.stdout.write("\n")
@@ -84,6 +84,8 @@ def main():
     current_example_printstate = "foreign"
     current_speech_proc = None
     current_speech_proc_state = None
+    # For the ability to go back to previous examples
+    all_examples = [current_example]
 
     def speech_proc_signal(sig=signal.SIGKILL):
         if current_speech_proc:
@@ -140,12 +142,25 @@ def main():
                 elif current_example_printstate == "native":
                     current_example_printstate = "done"
                     print(native_sentence)
+            elif option == "p":
+                speech_proc_signal()
+                if idx == 1:
+                    continue
+                idx -= 1
+                current_example_printstate = "foreign"
+                current_example = all_examples[idx - 1]
+                example_id = current_example.get("id", str(idx))
+                print_example_header(example_id)
             elif option == "n":
                 speech_proc_signal()
                 idx += 1
                 current_example_printstate = "foreign"
                 try:
-                    current_example = next(examples)
+                    if idx > len(all_examples):
+                        current_example = next(examples)
+                        all_examples.append(current_example)
+                    else:
+                        current_example = all_examples[idx - 1]
                     example_id = current_example.get("id", str(idx))
                 except StopIteration:
                     break
