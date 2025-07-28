@@ -157,7 +157,8 @@ def main():
                 elif option == "j":
                     current_speech_speed = max(current_speech_speed - 10, 10)
                     print_speed(current_speech_speed)
-                if current_speech_proc_state == "playing":
+
+                if speech_proc_state() == "playing":
                     speech_proc_signal()
                     current_speech_proc = speak_example(
                         example_id,
