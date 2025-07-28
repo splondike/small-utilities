@@ -32,31 +32,43 @@ def jsonl_iterator(fh: io.FileIO):
 def speak_example(
     id: str,
     sentence: str,
+    speech_speed: int,
     extra_args: list
 ) -> subprocess.Popen:
     maybe_speech_command = os.environ.get("SPEECH_COMMAND")
-    base_speech_command = \
-        [maybe_speech_command] if maybe_speech_command \
-        else DEFAULT_SPEECH_COMMAND
+    if maybe_speech_command:
+        base_speech_command = [maybe_speech_command]
+    else:
+        base_speech_command = DEFAULT_SPEECH_COMMAND
+        base_speech_command += ["-s", str(speech_speed)]
     final_speech_command = base_speech_command + extra_args + [sentence]
     return subprocess.Popen(
         final_speech_command + [sentence],
         env={
             **os.environ,
-            "EXAMPLE_ID": id
+            "EXAMPLE_ID": id,
+            "SPEECH_SPEED": str(speech_speed)
         }
     )
 
 
-def print_example_header(idx: int):
+def print_example_header(idx: int, speech_speed: int):
     print(f"Example {idx}")
     sys.stdout.write("\033[90m")
     sys.stdout.write(
-        "Controls: space=play/pause, r=restart speech, enter=print example\n"
+        "Controls:\n"
+        "  space=play/pause r=restart speech\n"
+        "  enter=print example q=quit\n"
+        "  n=next example p=previous example\n"
+        "  g=talk faster+restart j=talk slower\n"
     )
-    sys.stdout.write(
-        "          n=next example, p=previous example, q=quit"
-    )
+    sys.stdout.write("\033[0m")
+    print_speed(speech_speed)
+
+
+def print_speed(speed):
+    sys.stdout.write("\033[90m")
+    sys.stdout.write(f"  current speed: {speed}")
     sys.stdout.write("\033[0m")
     sys.stdout.write("\n")
 
@@ -84,6 +96,7 @@ def main():
     current_example_printstate = "foreign"
     current_speech_proc = None
     current_speech_proc_state = None
+    current_speech_speed = int(os.environ.get("SPEECH_SPEED", "100"))
     # For the ability to go back to previous examples
     all_examples = [current_example]
 
@@ -106,7 +119,7 @@ def main():
 
     idx = 1
     example_id = current_example.get("id", str(idx))
-    print_example_header(example_id)
+    print_example_header(example_id, current_speech_speed)
     try:
         while True:
             foreign_sentence = current_example["foreign"]
@@ -124,6 +137,7 @@ def main():
                     current_speech_proc = speak_example(
                         example_id,
                         foreign_sentence,
+                        current_speech_speed,
                         extra_speaker_args
                     )
                     current_speech_proc_state = "playing"
@@ -132,9 +146,26 @@ def main():
                 current_speech_proc = speak_example(
                     example_id,
                     foreign_sentence,
+                    current_speech_speed,
                     extra_speaker_args
                 )
                 current_speech_proc_state = "playing"
+            elif option in ("g", "j"):
+                if option == "g":
+                    current_speech_speed += 10
+                    print_speed(current_speech_speed)
+                elif option == "j":
+                    current_speech_speed = max(current_speech_speed - 10, 10)
+                    print_speed(current_speech_speed)
+                if current_speech_proc_state == "playing":
+                    speech_proc_signal()
+                    current_speech_proc = speak_example(
+                        example_id,
+                        foreign_sentence,
+                        current_speech_speed,
+                        extra_speaker_args
+                    )
+                    current_speech_proc_state = "playing"
             elif option == "\n":
                 if current_example_printstate == "foreign":
                     print(foreign_sentence)
@@ -150,7 +181,7 @@ def main():
                 current_example_printstate = "foreign"
                 current_example = all_examples[idx - 1]
                 example_id = current_example.get("id", str(idx))
-                print_example_header(example_id)
+                print_example_header(example_id, current_speech_speed)
             elif option == "n":
                 speech_proc_signal()
                 idx += 1
@@ -164,7 +195,7 @@ def main():
                     example_id = current_example.get("id", str(idx))
                 except StopIteration:
                     break
-                print_example_header(example_id)
+                print_example_header(example_id, current_speech_speed)
             elif option == "q":
                 break
             else:
