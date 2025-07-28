@@ -18,7 +18,7 @@ You are a foreign language tutor teaching {language}. Pick a common day to day s
 """
 
 
-def generate_example(prompt_text: str) -> dict:
+def generate_example(prompt_text: str, words: list) -> dict:
     result = subprocess.run(
         ["python", "llm-chat.py", "--oneshot"],
         capture_output=True,
@@ -37,18 +37,19 @@ def generate_example(prompt_text: str) -> dict:
     return {
         "id": id,
         "foreign": foreign,
-        "native": native
+        "native": native,
+        "words": words
     }
 
 
-def read_words():
+def read_words() -> list:
     if select.select([sys.stdin], [], [], 0)[0]:
         # Attempt to inject more variance into LLM by shuffling vocab
-        words = sys.stdin.readlines()
+        words = [w.strip() for w in sys.stdin.readlines()]
         random.shuffle(words)
-        return " ".join(words)
+        return words
     else:
-        return None
+        return []
 
 
 def main():
@@ -81,7 +82,8 @@ def main():
     )
 
     args = parser.parse_args()
-    words = read_words()
+    words_list = read_words()
+    words = " ".join(words_list)
     for _ in range(args.count):
         system_prompt = args.prompt.format(
             language=args.language,
@@ -91,7 +93,7 @@ def main():
             words_suffix="." if words else "",
             words=words
         )
-        example = generate_example(system_prompt)
+        example = generate_example(system_prompt, words_list)
         print(json.dumps(example))
 
 
