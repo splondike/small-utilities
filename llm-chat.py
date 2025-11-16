@@ -421,7 +421,7 @@ def read_prompt(multiline_timeout=0.25):
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
     parser.add_argument("--model", 
-                       help="The model to use: gpt-4.1-mini, gpt-4.1, claude-haiku, claude-sonnet", 
+                       help="The model to use: gpt-4.1-mini, gpt-4.1, gpt-5.1, claude-haiku, claude-sonnet", 
                        default="gpt-4.1-nano")
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
     parser.add_argument("--log", help="Log the conversation to this file in JSON format")
@@ -432,8 +432,8 @@ def main():
 
     if args.model.startswith("claude-"):
         model_map = {
-            "claude-haiku": "claude-3-haiku-20240307",
-            "claude-sonnet": "claude-3-sonnet-20240229"
+            "claude-haiku": "claude-haiku-4-5-20251001",
+            "claude-sonnet": "claude-sonnet-4-5-20250929"
         }
         client = AnthropicAPI(os.environ["ANTHROPIC_API_KEY"], model=model_map[args.model])
     else:
