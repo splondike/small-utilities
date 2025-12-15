@@ -182,7 +182,6 @@ class ChatContext():
                             capture_output=True,
                             check=False
                         )
-                        print(command, proc.returncode)
                         if proc.returncode != 0:
                             return False
                         self.files.append({
