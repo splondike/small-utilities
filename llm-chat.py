@@ -2,6 +2,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 import select
 import subprocess
 import sys
@@ -73,9 +74,11 @@ class AnthropicAPI:
 
 
 class OpenaiAPI:
-    def __init__(self, token, model):
+    def __init__(self, token, model, endpoint=None):
         self.token = token
         self.model = model
+        self.endpoint = \
+            endpoint or "https://api.openai.com/v1/chat/completions"
 
     def user_query_streamed(
         self,
@@ -90,7 +93,7 @@ class OpenaiAPI:
         }
 
         request = urllib.request.Request(
-            "https://api.openai.com/v1/chat/completions",
+            self.endpoint,
             data=json.dumps(data).encode(),
             headers={
                 "Content-Type": "application/json",
@@ -150,6 +153,28 @@ class ChatContext():
         """
         Adds the given file to the chat context
         """
+
+        maybe_match = re.match("^([a-z]+):(//)?", filename)
+
+        if maybe_match:
+            protocol = maybe_match.group(1)
+            rest = filename[len(maybe_match.group(0)):]
+            if protocol == "man":
+                proc = subprocess.run(
+                    ["man", rest],
+                    capture_output=True,
+                    check=False
+                )
+                if proc.returncode != 0:
+                    return False
+                self.files.append({
+                    "filename": filename,
+                    "content": proc.stdout.decode()
+                })
+                return True
+            elif protocol == "file":
+                filename = rest
+
         try:
             with open(filename) as fh:
                 self.files.append({
@@ -437,7 +462,11 @@ def main():
         }
         client = AnthropicAPI(os.environ["ANTHROPIC_API_KEY"], model=model_map[args.model])
     else:
-        client = OpenaiAPI(os.environ["OPENAI_API_KEY"], model=args.model)
+        client = OpenaiAPI(
+            os.environ["OPENAI_API_KEY"],
+            model=args.model,
+            endpoint=os.environ.get("OPENAI_API_ENDPOINT")
+        )
     context = ChatContext()
     if args.system_prompt:
         with open(args.system_prompt) as fh:
