@@ -4,6 +4,7 @@ import json
 import os
 import re
 import select
+import signal
 import subprocess
 import sys
 import time
@@ -480,6 +481,13 @@ def main():
     if args.log:
         log_file = open(args.log, "a")
 
+    interrupt_signaled = False
+
+    def signal_handler(*args):
+        nonlocal interrupt_signaled
+        interrupt_signaled = True
+
+    signal.signal(signal.SIGINT, signal_handler)
     response_counter = 0
     try:
         while True:
@@ -505,19 +513,26 @@ def main():
             if info_message != "":
                 sys.stdout.write(info_message + "\n")
             elif prompt_modified != "":
-                log_message(log_file, context.ROLE_USER, prompt)
                 start_time = time.time()
                 result = ""
                 for chunk in client.user_query_streamed(
                     context.build_messages(prompt_modified),
                     args.temperature
                 ):
+                    if interrupt_signaled:
+                        break
                     sys.stdout.write(chunk)
                     result += chunk
                 # Put the prompt on its own line.
                 sys.stdout.write("\n")
+
+                if interrupt_signaled:
+                    # Don't save this response to history
+                    interrupt_signaled = False
+                    continue
                 
                 response_time = time.time() - start_time
+                log_message(log_file, context.ROLE_USER, prompt)
                 log_message(log_file, context.ROLE_ASSISTANT, result, model=args.model, response_time=response_time, item_id=f"r{response_counter}")
                 context.add_history(context.ROLE_USER, prompt)
                 context.add_history(context.ROLE_ASSISTANT, result, item_id=f"r{response_counter}")
