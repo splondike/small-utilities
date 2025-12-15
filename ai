@@ -7,5 +7,5 @@ export ANTHROPIC_API_KEY=$($(dirname $0)/anthropic-password.gitignored)
 if echo "$@" | grep -q ' --oneshot';then
   python $(dirname $(readlink -f $0))/llm-chat.py $@
 else
-  rlwrap --multi-line --prompt-colour=blue --only-cook '!.*>> ' python -u $(dirname $(readlink -f $0))/llm-chat.py $@
+  rlwrap --multi-line --prompt-colour=blue --complete-filenames --only-cook '!.*>> ' python -u $(dirname $(readlink -f $0))/llm-chat.py $@
 fi
