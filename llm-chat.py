@@ -173,6 +173,26 @@ class ChatContext():
                     "content": proc.stdout.decode()
                 })
                 return True
+            elif protocol == "clip":
+                commands = ["wl-paste", "pbpaste", "termux-clipboard-get"]
+                for command in commands:
+                    try:
+                        proc = subprocess.run(
+                            [command],
+                            capture_output=True,
+                            check=False
+                        )
+                        print(command, proc.returncode)
+                        if proc.returncode != 0:
+                            return False
+                        self.files.append({
+                            "filename": filename,
+                            "content": proc.stdout.decode()
+                        })
+                        return True
+                    except FileNotFoundError:
+                        pass
+                return False
             elif protocol == "file":
                 filename = rest
 
