@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Preview arbitrary file types in the terminal in a non-interractive way
+# (i.e. exits immediately)
+
+if ! env | grep ^TERM= | grep kitty > /dev/null;then
+    echo "For now only Kitty is supported"
+fi
+
+filename=$1
+filename_lower=$(echo "$filename" | tr 'A-Z' 'a-z')
+shift
+
+if echo "$filename_lower" | grep -q "\.\(avi\|mov\|mp4\|mpeg\|thm\|lrv\)\$";then
+    tempfile=$(mktemp --suffix=.jpg)
+    ffmpeg -loglevel quiet -y -i "$filename" -vf "select=eq(n\,34),drawbox=x=0:y=0:w=40:h=40:color=black:t=fill,drawbox=x=10:y=10:w=20:h=20:color=white" -vframes 1 $tempfile
+    kitten icat $@ "$tempfile"
+    rm "$tempfile"
+elif echo "$filename_lower" | grep -q "\.\(pdf\)\$";then
+    tempfile=$(mktemp --suffix=.jpg)
+    magick "$filename"[0] $tempfile
+    kitten icat $@ "$tempfile"
+    rm "$tempfile"
+elif echo "$filename_lower" | grep -q "\.\(png\|jpg\|jpeg\)\$";then
+    kitten icat $@ "$filename"
+else
+    head -n 10 "$filename"
+fi
