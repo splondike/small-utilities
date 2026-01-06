@@ -1,0 +1,3 @@
+#!/bin/sh
+
+nvimtui -- python -u $(dirname $0)/nt_csvfiles.py $@
