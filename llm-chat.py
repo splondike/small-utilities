@@ -75,9 +75,10 @@ class AnthropicAPI:
 
 
 class OpenaiAPI:
-    def __init__(self, token, model, endpoint=None):
+    def __init__(self, token, model, reasoning=None, endpoint=None):
         self.token = token
         self.model = model
+        self.reasoning = reasoning
         self.endpoint = \
             endpoint or "https://api.openai.com/v1/chat/completions"
 
@@ -90,7 +91,10 @@ class OpenaiAPI:
             "model": self.model,
             "messages": messages,
             "temperature": temperature or 1.0,
-            "stream": True
+            "stream": True,
+            **({
+                "reasoning_effort": self.reasoning
+            } if self.reasoning else {})
         }
 
         request = urllib.request.Request(
@@ -465,13 +469,16 @@ def read_prompt(multiline_timeout=0.25):
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with LLMs in the terminal")
-    parser.add_argument("--model", 
-                       help="The model to use: gpt-4.1-mini, gpt-4.1, gpt-5.1, claude-haiku, claude-sonnet", 
-                       default="gpt-4.1-nano")
+    parser.add_argument(
+        "--model",
+        help="The model to use: gpt-5, claude-haiku, claude-sonnet",
+        default="gpt-5-nano"
+    )
     parser.add_argument("--system-prompt", help="Will load a system prompt from this file")
     parser.add_argument("--log", help="Log the conversation to this file in JSON format")
     parser.add_argument("--restore", help="Restore chat history from this log file")
     parser.add_argument("--temperature", type=float, help="Adjust randomness")
+    parser.add_argument("--reasoning", type=str, default="minimal", help="How much chain of thought to do")
     parser.add_argument("--oneshot", help="Just accept some input on stdin, write the response and then exit", action="store_true")
     args = parser.parse_args()
 
@@ -485,6 +492,7 @@ def main():
         client = OpenaiAPI(
             os.environ["OPENAI_API_KEY"],
             model=args.model,
+            reasoning=args.reasoning,
             endpoint=os.environ.get("OPENAI_API_ENDPOINT")
         )
     context = ChatContext()
