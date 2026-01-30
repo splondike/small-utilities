@@ -88,10 +88,12 @@ class OpenaiAPI:
         temperature: Optional[float]
     ) -> Iterator[str]:
         data = {
-            "model": self.model,
             "messages": messages,
             "temperature": temperature or 1.0,
             "stream": True,
+            **({
+                "model": self.model,
+            } if self.model else {}),
             **({
                 "reasoning_effort": self.reasoning
             } if self.reasoning else {})
@@ -488,6 +490,13 @@ def main():
             "claude-sonnet": "claude-sonnet-4-5-20250929"
         }
         client = AnthropicAPI(os.environ["ANTHROPIC_API_KEY"], model=model_map[args.model])
+    elif args.model == "local":
+        client = OpenaiAPI(
+            "",
+            model=None,
+            reasoning=args.reasoning,
+            endpoint=os.environ.get("OPENAI_API_ENDPOINT", "http://localhost:8080/v1/chat/completions")
+        )
     else:
         client = OpenaiAPI(
             os.environ["OPENAI_API_KEY"],
