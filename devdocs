@@ -1,0 +1,26 @@
+#!/bin/sh
+
+APP=devdocs
+CACHE_TIME=600
+OPTIONS="python~3.14\nterraform\ndjango~6.0"
+
+category=$(echo "$OPTIONS" | fzf)
+
+while true;do
+    index_file=$(http-caching.py --min-cache-time $CACHE_TIME $APP "https://documents.devdocs.io/$category/index.json")
+
+    entry=$(jq -r '.entries[] | (.name + " (" + .type + ")")' "$index_file" | fzf)
+    if [ -z "$entry" ];then
+        exit 0
+    fi
+    path=$(jq -r --arg key "$entry" '.entries[] | select((.name + " (" + .type + ")") == $key) | .path' "$index_file")
+    base_path=$(echo "$path" | awk -F# '{print $1}')
+    hash=$(echo "$path" | awk -F# '{print $2}')
+
+    html_file=$(http-caching.py --min-cache-time $CACHE_TIME $APP "https://documents.devdocs.io/$category/$base_path.html")
+    if [ -z "$hash" ];then
+        w3m "file://$html_file"
+    else
+        w3m "file://$html_file#$hash"
+    fi
+done
