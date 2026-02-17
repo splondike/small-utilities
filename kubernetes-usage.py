@@ -18,8 +18,12 @@ def exec_json(args):
 
 
 def normalize_quantity(quantity_str):
-    if quantity_str.endswith("m"):
-        return float(quantity_str[:-1])
+    if quantity_str.endswith("n"):
+        # nanocores
+        return float(quantity_str[:-1]) / (1000**3)
+    elif quantity_str.endswith("m"):
+        # millicores
+        return float(quantity_str[:-1]) / (1000)
     elif quantity_str.endswith("Ki"):
         return float(quantity_str[:-2]) / 1024.0
     elif quantity_str.endswith("Mi"):
@@ -36,7 +40,17 @@ def glob_to_re(glob):
 
 
 def namespace_stats(namespace, pod_globs, node_globs, log_progress):
-    quantity_fieldnames = ["cpu", "memory", "cpu_daemonset", "memory_daemonset", "pod_count"]
+    quantity_fieldnames = [
+        "cpu_used",
+        "memory_used",
+        "cpu_used_daemonset",
+        "memory_used_daemonset",
+        "cpu_request",
+        "memory_request",
+        "cpu_request_daemonset",
+        "memory_request_daemonset",
+        "pod_count"
+    ]
     if namespace == "all":
         ns_result = exec_json(["kubectl", "get", "ns", "-o", "json"])
         namespaces = [
@@ -53,6 +67,7 @@ def namespace_stats(namespace, pod_globs, node_globs, log_progress):
     allowlist_node_globs = [glob_to_re(g) for g in node_globs_]
 
     namespace_results = collections.defaultdict(lambda: {q: 0.0 for q in quantity_fieldnames})
+    daemonset_pods = set()
     for namespace in namespaces:
         pods_data = exec_json(["kubectl", "get", "pods", "-o", "json", "--namespace", namespace])
         # Ensure this exists
@@ -85,16 +100,38 @@ def namespace_stats(namespace, pod_globs, node_globs, log_progress):
                 ref["kind"] == "DaemonSet"
                 for ref in pod["metadata"].get("ownerReferences", [])
             )
+            pod_name = pod["metadata"]["name"]
+            if is_daemonset:
+                daemonset_pods.add(f"{namespace}.{pod_name}")
 
             for container in pod["spec"]["containers"]:
                 for resource_type in ("cpu", "memory"):
                     quantity_str = container.get("resources", {}).get("requests", {}).get(resource_type)
                     quantity = 0.0 if quantity_str is None else normalize_quantity(quantity_str)
 
+                    label_base = resource_type + "_request"
                     if is_daemonset:
-                        namespace_results[namespace][resource_type + "_daemonset"] += quantity
+                        namespace_results[namespace][label_base + "_daemonset"] += quantity
                     else:
-                        namespace_results[namespace][resource_type] += quantity
+                        namespace_results[namespace][label_base] += quantity
+
+    metrics_data = exec_json(
+        ["kubectl", "get", "--raw", "/apis/metrics.k8s.io/v1beta1/pods"]
+    )
+    for namespace in namespaces:
+        for pod in metrics_data["items"]:
+            if pod["metadata"]["namespace"] != namespace:
+                continue
+            pod_name = pod["metadata"]["name"]
+
+            is_daemonset = f"{namespace}.{pod_name}" in daemonset_pods
+
+            for container in pod["containers"]:
+                for metric in ("cpu", "memory"):
+                    label = f"{metric}_used_daemonset" if is_daemonset else f"{metric}_used"
+                    namespace_results[namespace][label] += normalize_quantity(
+                        container["usage"][metric]
+                    )
 
     out = csv.DictWriter(sys.stdout, fieldnames=["namespace"] + quantity_fieldnames)
     out.writeheader()
